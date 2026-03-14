@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Spec Comparison (V2)</title>
+    <title>Monitor Spec Comparison (V3)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         /* เน้นโทน ขาว-เทา สไตล์มินิมอล */
         :root {
@@ -30,14 +31,24 @@
 
         h1 { font-size: 1.5rem; text-align: center; margin-bottom: 20px; color: #555; }
 
-        /* ระบบค้นหา */
-        .search-box { position: relative; margin-bottom: 20px; }
+        /* ระบบค้นหา และปุ่มสแกน */
+        .search-wrapper { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
+        .search-box { flex-grow: 1; position: relative; }
         .search-box input {
             width: 100%; padding: 12px;
             border: 1px solid var(--border-color); border-radius: 6px;
             font-size: 1rem; outline: none;
         }
         .search-box input:focus { border-color: #999; }
+        
+        .scan-btn {
+            background-color: var(--text-main); color: white;
+            border: none; border-radius: 6px; padding: 0 20px;
+            font-size: 1rem; cursor: pointer; white-space: nowrap;
+            transition: background-color 0.3s;
+        }
+        .scan-btn:hover { background-color: #555; }
+
         .search-results {
             position: absolute; top: 100%; left: 0; right: 0;
             background: white; border: 1px solid var(--border-color);
@@ -49,6 +60,11 @@
         .search-result-item:hover { background-color: var(--bg-gray); }
         .result-code { font-weight: bold; }
         .result-desc { font-size: 0.85rem; color: #666; }
+
+        /* พื้นที่แสดงกล้องสแกนเนอร์ */
+        #reader-container { display: none; margin-bottom: 20px; text-align: center; background: var(--bg-gray); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); }
+        #reader { width: 100%; max-width: 400px; margin: 0 auto; }
+        .close-scanner-btn { margin-top: 10px; background: #ff4d4d; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
 
         /* โมเดลที่เลือก */
         .selected-models { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
@@ -64,7 +80,7 @@
         }
         .remove-btn:hover { color: #333; }
 
-        /* ตัวเลือกแสดงผล (Toggle Specs) */
+        /* ตัวเลือกแสดงผล */
         .toggle-section { margin-bottom: 20px; }
         .toggle-section summary {
             cursor: pointer; padding: 10px; background: var(--bg-gray);
@@ -82,8 +98,6 @@
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th, td { padding: 12px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
         th { background-color: var(--bg-gray); font-weight: bold; white-space: nowrap; }
-        
-        /* ตรึงคอลัมน์แรก (ชื่อ Spec) */
         th:first-child, td:first-child {
             position: sticky; left: 0; background-color: #fcfcfc; z-index: 2;
             font-weight: bold; border-right: 2px solid var(--border-color);
@@ -96,24 +110,14 @@
             background: var(--bg-gray); border-radius: 6px; border: 1px solid var(--border-color);
         }
         #qrcode { margin: 15px auto; width: 150px; height: 150px; display: inline-block; }
-        #qrcode img, #qrcode canvas { display: inline-block; } /* ensure the image can be downloaded */
+        #qrcode img, #qrcode canvas { display: inline-block; }
         .qr-text { font-size: 0.9rem; color: #555; margin-top: 10px; }
-        
-        /* New button style */
         .download-btn {
-            background-color: var(--bg-gray);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            margin-top: 15px;
-            transition: background-color 0.3s;
+            background-color: var(--bg-gray); border: 1px solid var(--border-color);
+            color: var(--text-main); padding: 10px 20px; border-radius: 6px;
+            cursor: pointer; font-size: 0.9rem; margin-top: 15px; transition: background-color 0.3s;
         }
-        .download-btn:hover {
-            background-color: var(--btn-hover);
-        }
+        .download-btn:hover { background-color: var(--btn-hover); }
 
         .loading { text-align: center; padding: 20px; color: #666; }
     </style>
@@ -121,14 +125,22 @@
 <body>
 
 <div class="container">
-    <h1>Monitor Spec Comparison (V2)</h1>
+    <h1>Monitor Spec Comparison</h1>
 
     <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
 
     <div id="app" style="display: none;">
-        <div class="search-box">
-            <input type="text" id="searchInput" placeholder="ค้นหาจาก CODE, Barcode, Description หรือ PartNo... (เลือกได้สูงสุด 4 รุ่น)">
-            <div id="searchResults" class="search-results"></div>
+        <div class="search-wrapper">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="ค้นหา CODE, Barcode, PartNo หรือ Description...">
+                <div id="searchResults" class="search-results"></div>
+            </div>
+            <button class="scan-btn" onclick="toggleScanner()">📷 สแกน</button>
+        </div>
+
+        <div id="reader-container">
+            <div id="reader"></div>
+            <button class="close-scanner-btn" onclick="stopScanner()">ปิดกล้อง</button>
         </div>
 
         <div id="selectedModelsContainer" class="selected-models"></div>
@@ -155,22 +167,21 @@
 </div>
 
 <script>
-    // URL ดึงข้อมูล CSV จาก Google Sheets
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/1HIG7msA_JvFxV8gheb1j3Y86mm3CilO4FqagJuGf8Vo/export?format=csv&gid=0";
     
-    // สถานะของแอพพลิเคชัน
     let allMonitors = [];
     let selectedMonitors = [];
     let allHeaders = [];
     const MANDATORY_HEADERS = ["CODE", "Description", "PartNo"];
     let optionalHeaders = [];
-    let hiddenHeaders = new Set(); // เก็บหัวข้อที่ User ไม่ต้องการให้แสดง
+    let hiddenHeaders = new Set(); 
 
     const searchInput = document.getElementById('searchInput');
     const searchResults = document.getElementById('searchResults');
     let qrCodeInstance = null;
+    let html5QrcodeScanner = null;
 
-    // 1. ดึงและประมวลผลข้อมูลเริ่มต้น
+    // 1. ดึงและประมวลผลข้อมูล
     Papa.parse(SHEET_URL, {
         download: true,
         header: true,
@@ -178,8 +189,6 @@
         complete: function(results) {
             allMonitors = results.data;
             allHeaders = results.meta.fields || Object.keys(allMonitors[0]);
-            
-            // แยกหัวข้อสเปคที่ซ่อนได้ออกจากหัวข้อที่บังคับ
             optionalHeaders = allHeaders.filter(h => !MANDATORY_HEADERS.includes(h) && h.trim() !== "");
             
             document.getElementById('loading').style.display = 'none';
@@ -188,14 +197,14 @@
             initApp();
         },
         error: function(err) {
-            document.getElementById('loading').innerText = "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาตรวจสอบสิทธิ์ของ Google Sheets";
+            document.getElementById('loading').innerText = "เกิดข้อผิดพลาดในการดึงข้อมูล";
         }
     });
 
     function initApp() {
         renderCheckboxes();
 
-        // ตรวจสอบ URL Parameter เผื่อมีการแสกน QR Code เข้ามา (เช่น ?code=XX)
+        // ตรวจสอบ URL Parameter เผื่อมีการแสกน QR Code แบบ Direct Link เข้ามา
         const urlParams = new URLSearchParams(window.location.search);
         const codeParam = urlParams.get('code');
         if (codeParam) {
@@ -205,7 +214,6 @@
 
         renderTable();
         
-        // Event Listeners สำหรับระบบค้นหา
         searchInput.addEventListener('input', handleSearch);
         document.addEventListener('click', (e) => {
             if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
@@ -214,7 +222,83 @@
         });
     }
 
-    // 2. ระบบค้นหา (ปรับปรุง V2: เพิ่มการค้นหาด้วย Barcode)
+    // 2. ระบบสแกน Barcode / QR Code ผ่านกล้องมือถือ
+    function toggleScanner() {
+        const container = document.getElementById('reader-container');
+        if (container.style.display === 'block') {
+            stopScanner();
+        } else {
+            startScanner();
+        }
+    }
+
+    function startScanner() {
+        document.getElementById('reader-container').style.display = 'block';
+        
+        // กำหนดตั้งค่า Scanner (เน้นกล้องหลัง, สแกนไว)
+        html5QrcodeScanner = new Html5Qrcode("reader");
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+        html5QrcodeScanner.start(
+            { facingMode: "environment" }, // บังคับใช้กล้องหลัง
+            config,
+            (decodedText, decodedResult) => {
+                // เมื่อสแกนสำเร็จ
+                stopScanner();
+                processScannedData(decodedText);
+            },
+            (errorMessage) => {
+                // สแกนยังไม่เจอ ไม่ต้องทำอะไร (ทำงานวนไปจนกว่าจะเจอ)
+            }
+        ).catch((err) => {
+            alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตให้เว็บไซต์เข้าถึงกล้องถ่ายรูป");
+            stopScanner();
+        });
+    }
+
+    function stopScanner() {
+        document.getElementById('reader-container').style.display = 'none';
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().catch(err => console.log("Error stopping scanner", err));
+            html5QrcodeScanner.clear();
+            html5QrcodeScanner = null;
+        }
+    }
+
+    // ประมวลผลข้อความที่ได้จากกล้อง
+    function processScannedData(scannedText) {
+        let searchValue = scannedText;
+
+        // ตรวจสอบว่าเป็น URL (Direct Link QR) หรือไม่
+        try {
+            const url = new URL(scannedText);
+            const codeParam = url.searchParams.get('code');
+            if (codeParam) {
+                searchValue = codeParam; // ตัดเอาเฉพาะรหัส CODE ออกมา
+            }
+        } catch (e) {
+            // ไม่ใช่ URL แสดงว่าเป็น Barcode ปกติจากกล่อง ปล่อยผ่าน
+        }
+
+        // ค้นหาใน Database ว่าตรงกับรุ่นไหน (เปรียบเทียบทั้ง CODE และ Barcode)
+        const found = allMonitors.find(m => 
+            (m.CODE && m.CODE.toUpperCase() === searchValue.toUpperCase()) || 
+            (m.Barcode && m.Barcode === searchValue)
+        );
+
+        if (found) {
+            // ถ้าเจอ ให้เพิ่มเข้าตารางเปรียบเทียบอัตโนมัติ
+            addModel(found);
+            searchInput.value = ''; 
+        } else {
+            // ถ้าไม่เจอเป๊ะๆ ให้เอาข้อความไปใส่ในช่องค้นหาแทน แล้วดึงผลลัพธ์ลงมาให้ดู
+            alert("ไม่พบข้อมูลสเปคที่ตรงกันเป๊ะสำหรับ: " + searchValue);
+            searchInput.value = searchValue;
+            searchInput.dispatchEvent(new Event('input')); // เรียกให้ผลลัพธ์ Search แสดง
+        }
+    }
+
+    // 3. ระบบค้นหาแบบพิมพ์
     function handleSearch(e) {
         const query = e.target.value.toLowerCase();
         searchResults.innerHTML = '';
@@ -225,16 +309,15 @@
 
         const matches = allMonitors.filter(m => 
             (m.CODE && m.CODE.toLowerCase().includes(query)) ||
-            (m.Barcode && m.Barcode.toLowerCase().includes(query)) || // New Barcode condition
+            (m.Barcode && m.Barcode.toLowerCase().includes(query)) ||
             (m.Description && m.Description.toLowerCase().includes(query)) ||
             (m.PartNo && m.PartNo.toLowerCase().includes(query))
-        ).slice(0, 10); // แสดงแค่ 10 อันดับแรกให้เลือก
+        ).slice(0, 10);
 
         if (matches.length > 0) {
             matches.forEach(m => {
                 const div = document.createElement('div');
                 div.className = 'search-result-item';
-                // ปรับปรุงผลลัพธ์การค้นหาให้แสดง Barcode ด้วย
                 div.innerHTML = `<div class="result-code">${m.CODE || '-'} (PartNo: ${m.PartNo || '-'} | Barcode: ${m.Barcode || '-'})</div>
                                  <div class="result-desc">${m.Description || '-'}</div>`;
                 div.onclick = () => {
@@ -250,7 +333,7 @@
         }
     }
 
-    // 3. จัดการโมเดลที่ต้องการเปรียบเทียบ
+    // 4. จัดการโมเดลที่ต้องการเปรียบเทียบ
     function addModel(model) {
         if (selectedMonitors.length >= 4) {
             alert("สามารถเปรียบเทียบได้สูงสุด 4 รุ่นเท่านั้นครับ");
@@ -270,7 +353,6 @@
         updateUI();
     }
 
-    // 4. แสดงผลโมเดลที่เลือก (Tags)
     function renderSelectedModels() {
         const container = document.getElementById('selectedModelsContainer');
         container.innerHTML = '';
@@ -293,7 +375,7 @@
             
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
-            checkbox.checked = true; // ค่าเริ่มต้นให้แสดงทั้งหมด
+            checkbox.checked = true;
             checkbox.value = header;
             checkbox.onchange = (e) => {
                 if(e.target.checked) {
@@ -319,7 +401,6 @@
 
         if (selectedMonitors.length === 0) return;
 
-        // สร้างส่วนหัวตาราง (ชื่อคอลัมน์)
         let trHead = document.createElement('tr');
         trHead.innerHTML = `<th>Specification</th>`;
         selectedMonitors.forEach(m => {
@@ -327,15 +408,11 @@
         });
         head.appendChild(trHead);
 
-        // หัวข้อที่บังคับแสดงต้องขึ้นก่อน
         const headersToShow = [...MANDATORY_HEADERS, ...optionalHeaders.filter(h => !hiddenHeaders.has(h))];
 
-        // สร้างแถวข้อมูลสเปค
         headersToShow.forEach(header => {
             let tr = document.createElement('tr');
-            // คอลัมน์แรกคือชื่อสเปค
             tr.innerHTML = `<td>${header}</td>`;
-            // คอลัมน์ต่อๆ ไปคือข้อมูลของแต่ละรุ่น
             selectedMonitors.forEach(m => {
                 tr.innerHTML += `<td>${m[header] || '-'}</td>`;
             });
@@ -343,25 +420,22 @@
         });
     }
 
-    // 7. จัดการ QR Code Direct Link (ปรับปรุง V2: เพิ่มฟังก์ชันดาวน์โหลด PNG)
+    // 7. จัดการ QR Code Direct Link
     function handleQRCode() {
         const qrSection = document.getElementById('qrCodeSection');
         const qrContainer = document.getElementById('qrcode');
         const qrText = document.getElementById('qrText');
-        const downloadBtn = document.getElementById('downloadQrBtn'); // select new button
+        const downloadBtn = document.getElementById('downloadQrBtn');
 
-        // Reset the download button's event listener to avoid duplicates
         downloadBtn.onclick = null;
 
         if (selectedMonitors.length === 1) {
             qrSection.style.display = 'block';
-            qrContainer.innerHTML = ''; // clear previous QR
+            qrContainer.innerHTML = ''; 
 
             const modelCode = selectedMonitors[0].CODE;
-            // สร้าง URL ตรง (Direct link) กลับมาที่หน้านี้พร้อมแนบ ?code=
             const directUrl = window.location.origin + window.location.pathname + "?code=" + encodeURIComponent(modelCode);
 
-            // Generate the QR code
             qrCodeInstance = new QRCode(qrContainer, {
                 text: directUrl,
                 width: 150,
@@ -373,36 +447,27 @@
 
             qrText.innerText = `สแกนเพื่อดูสเปค ${modelCode} โดยตรง`;
 
-            // Implement download functionality
             downloadBtn.onclick = function() {
-                // Find the image element inside the container
-                // QRCodeJS usually puts an <img> tag
                 const qrImg = qrContainer.querySelector('img');
-
-                // If qrcodejs used a canvas (some configs/browsers), handle that too
                 const qrCanvas = qrContainer.querySelector('canvas');
 
                 let imgSrc;
-                if (qrImg) {
+                if (qrImg && qrImg.src) {
                     imgSrc = qrImg.src;
                 } else if (qrCanvas) {
                     imgSrc = qrCanvas.toDataURL("image/png");
                 } else {
-                    alert("เกิดข้อผิดพลาดในการดึงรูปภาพ QR Code กรุณาลองใหม่");
+                    alert("เกิดข้อผิดพลาดในการดาวน์โหลด QR Code");
                     return;
                 }
 
-                // Create a dynamic <a> element for the download
                 const downloadLink = document.createElement('a');
                 downloadLink.href = imgSrc;
-                // Set the filename: [CODE].png (default)
-                const filename = (modelCode || 'qrcode').toUpperCase() + '.png';
-                downloadLink.download = filename;
-
-                // Programmatically click the link to trigger download
+                downloadLink.download = (modelCode || 'qrcode').toUpperCase() + '.png';
+                
                 document.body.appendChild(downloadLink);
                 downloadLink.click();
-                document.body.removeChild(downloadLink); // Clean up
+                document.body.removeChild(downloadLink);
             };
 
         } else {
@@ -410,7 +475,6 @@
         }
     }
 
-    // ฟังก์ชันอัปเดตหน้าจอทั้งหมดเมื่อมีการเพิ่ม/ลดรุ่น
     function updateUI() {
         renderSelectedModels();
         renderTable();
