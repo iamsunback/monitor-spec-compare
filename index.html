@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Spec Comparison (V3.1)</title>
+    <title>Monitor Spec Comparison (V3.2)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -264,7 +264,7 @@
         }
     }
 
-    // ประมวลผลข้อความที่ได้จากกล้อง (แก้ไขใน V3.1)
+    // ประมวลผลข้อความที่ได้จากกล้อง (อัปเดต V3.2)
     function processScannedData(scannedText) {
         let searchValue = scannedText;
 
@@ -279,11 +279,14 @@
             // ไม่ใช่ URL แสดงว่าเป็น Barcode ปกติจากกล่อง ปล่อยผ่าน
         }
 
-        // นำค่าที่สแกนได้ไปใส่ในช่องค้นหาให้ User เห็น
+        // 1. นำค่าที่สแกนได้ไปใส่ในช่องค้นหา
         searchInput.value = searchValue;
         
-        // สั่งให้ระบบค้นหา (Dropdown) แสดงผลลัพธ์ออกมาทันที
-        searchInput.dispatchEvent(new Event('input'));
+        // 2. บังคับให้หน้าจอโฟกัสไปที่ช่องค้นหา เพื่อป้องกันไม่ให้คลิกอื่นรบกวนการแสดงผล
+        searchInput.focus();
+
+        // 3. สั่งให้ฟังก์ชันค้นหาทำงานทันทีแบบตรงๆ (Direct Call) โดยส่ง Object ของช่องค้นหาเข้าไปแทน Event
+        handleSearch({ target: searchInput });
     }
 
     // 3. ระบบค้นหาแบบพิมพ์
