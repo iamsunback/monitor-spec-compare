@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Spec Comparison (V3.3)</title>
+    <title>Monitor Spec Comparison (V3.4)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -108,7 +108,7 @@
 
         .loading { text-align: center; padding: 20px; color: #666; }
 
-        /* 🌟 ส่วนของ Popup (Modal) สำหรับผลการสแกน 🌟 */
+        /* 🌟 ส่วนของ Popup (Modal) 🌟 */
         .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.6); z-index: 1000;
@@ -129,7 +129,7 @@
 <body>
 
 <div class="container">
-    <h1>Monitor Spec Comparison v3.3</h1>
+    <h1>Monitor Spec Comparison v3.4</h1>
 
     <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
 
@@ -192,7 +192,6 @@
     let optionalHeaders = [];
     let hiddenHeaders = new Set(); 
     
-    // ตัวแปรสำหรับเก็บข้อมูลชั่วคราวตอนสแกนเจอ
     let tempScannedModel = null;
 
     const searchInput = document.getElementById('searchInput');
@@ -238,7 +237,7 @@
             }
         });
 
-        // กำหนด Event ยืนยันใน Popup
+        // Event ยืนยันใน Popup
         document.getElementById('confirmAddBtn').addEventListener('click', () => {
             if(tempScannedModel) {
                 addModel(tempScannedModel);
@@ -262,26 +261,32 @@
         html5QrcodeScanner.start(
             { facingMode: "environment" }, config,
             (decodedText) => {
-                stopScanner();
+                // แก้ไข V3.4: สั่งทำงาน Popup ก่อน แล้วค่อยสั่งปิดกล้อง
                 processScannedData(decodedText);
+                stopScanner();
             },
-            () => {} // ไม่ต้องทำอะไรถ้ายังสแกนไม่เจอ
+            () => {} 
         ).catch(() => {
             alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตให้เว็บไซต์เข้าถึงกล้องถ่ายรูป");
             stopScanner();
         });
     }
 
+    // แก้ไข V3.4: เปลี่ยนวิธีการปิดกล้องให้ปลอดภัย ไม่ชนกับ Popup
     function stopScanner() {
         document.getElementById('reader-container').style.display = 'none';
         if (html5QrcodeScanner) {
-            html5QrcodeScanner.stop().catch(err => console.log(err));
-            html5QrcodeScanner.clear();
-            html5QrcodeScanner = null;
+            html5QrcodeScanner.stop().then(() => {
+                html5QrcodeScanner.clear();
+                html5QrcodeScanner = null;
+            }).catch(err => {
+                console.log("Error stopping scanner:", err);
+                html5QrcodeScanner = null;
+            });
         }
     }
 
-    // 🌟 ประมวลผลและแสดง Popup (แก้ไข V3.3) 🌟
+    // ประมวลผลและแสดง Popup
     function processScannedData(scannedText) {
         let searchValue = scannedText.trim();
 
@@ -291,14 +296,12 @@
             if (codeParam) { searchValue = codeParam; }
         } catch (e) { /* ปล่อยผ่านถ้าเป็นข้อความธรรมดา */ }
 
-        // ค้นหาในฐานข้อมูลด้วยโค้ด Javascript โดยตรง
         const found = allMonitors.find(m => 
             (m.CODE && m.CODE.toUpperCase() === searchValue.toUpperCase()) ||
             (m.Barcode && m.Barcode === searchValue)
         );
 
         if (found) {
-            // กรณีเจอ: ดึงข้อมูลขึ้น Popup
             tempScannedModel = found;
             const infoDiv = document.getElementById('modalInfo');
             infoDiv.innerHTML = `
@@ -308,18 +311,16 @@
             `;
             document.getElementById('scanModal').style.display = 'flex'; // แสดง Popup
         } else {
-            // กรณีไม่เจอ: แจ้งเตือน Alert
             alert("ไม่พบข้อมูลสำหรับสเปค: " + searchValue);
         }
     }
 
-    // ฟังก์ชันปิด Popup
     function closeModal() {
         document.getElementById('scanModal').style.display = 'none';
         tempScannedModel = null;
     }
 
-    // 3. ค้นหาแบบพิมพ์ (ปกติ)
+    // 3. ค้นหาแบบพิมพ์
     function handleSearch(e) {
         const query = e.target.value.toLowerCase();
         searchResults.innerHTML = '';
