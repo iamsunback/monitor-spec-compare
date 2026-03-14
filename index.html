@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Spec Comparison (V3)</title>
+    <title>Monitor Spec Comparison (V3.1)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
@@ -235,12 +235,11 @@
     function startScanner() {
         document.getElementById('reader-container').style.display = 'block';
         
-        // กำหนดตั้งค่า Scanner (เน้นกล้องหลัง, สแกนไว)
         html5QrcodeScanner = new Html5Qrcode("reader");
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
         html5QrcodeScanner.start(
-            { facingMode: "environment" }, // บังคับใช้กล้องหลัง
+            { facingMode: "environment" }, 
             config,
             (decodedText, decodedResult) => {
                 // เมื่อสแกนสำเร็จ
@@ -248,7 +247,7 @@
                 processScannedData(decodedText);
             },
             (errorMessage) => {
-                // สแกนยังไม่เจอ ไม่ต้องทำอะไร (ทำงานวนไปจนกว่าจะเจอ)
+                // รอสแกนต่อไป
             }
         ).catch((err) => {
             alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตให้เว็บไซต์เข้าถึงกล้องถ่ายรูป");
@@ -265,7 +264,7 @@
         }
     }
 
-    // ประมวลผลข้อความที่ได้จากกล้อง
+    // ประมวลผลข้อความที่ได้จากกล้อง (แก้ไขใน V3.1)
     function processScannedData(scannedText) {
         let searchValue = scannedText;
 
@@ -280,22 +279,11 @@
             // ไม่ใช่ URL แสดงว่าเป็น Barcode ปกติจากกล่อง ปล่อยผ่าน
         }
 
-        // ค้นหาใน Database ว่าตรงกับรุ่นไหน (เปรียบเทียบทั้ง CODE และ Barcode)
-        const found = allMonitors.find(m => 
-            (m.CODE && m.CODE.toUpperCase() === searchValue.toUpperCase()) || 
-            (m.Barcode && m.Barcode === searchValue)
-        );
-
-        if (found) {
-            // ถ้าเจอ ให้เพิ่มเข้าตารางเปรียบเทียบอัตโนมัติ
-            addModel(found);
-            searchInput.value = ''; 
-        } else {
-            // ถ้าไม่เจอเป๊ะๆ ให้เอาข้อความไปใส่ในช่องค้นหาแทน แล้วดึงผลลัพธ์ลงมาให้ดู
-            alert("ไม่พบข้อมูลสเปคที่ตรงกันเป๊ะสำหรับ: " + searchValue);
-            searchInput.value = searchValue;
-            searchInput.dispatchEvent(new Event('input')); // เรียกให้ผลลัพธ์ Search แสดง
-        }
+        // นำค่าที่สแกนได้ไปใส่ในช่องค้นหาให้ User เห็น
+        searchInput.value = searchValue;
+        
+        // สั่งให้ระบบค้นหา (Dropdown) แสดงผลลัพธ์ออกมาทันที
+        searchInput.dispatchEvent(new Event('input'));
     }
 
     // 3. ระบบค้นหาแบบพิมพ์
@@ -322,6 +310,7 @@
                                  <div class="result-desc">${m.Description || '-'}</div>`;
                 div.onclick = () => {
                     addModel(m);
+                    // ล้างช่องค้นหาเมื่อ User กดเลือกแล้วเท่านั้น
                     searchInput.value = '';
                     searchResults.style.display = 'none';
                 };
@@ -329,7 +318,9 @@
             });
             searchResults.style.display = 'block';
         } else {
-            searchResults.style.display = 'none';
+            // กรณีไม่พบข้อมูล
+            searchResults.innerHTML = '<div class="search-result-item" style="color:red; text-align:center;">ไม่พบข้อมูลสเปคที่ตรงกัน</div>';
+            searchResults.style.display = 'block';
         }
     }
 
