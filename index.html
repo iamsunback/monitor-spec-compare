@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor Spec Comparison</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* เน้นโทน ขาว-เทา สไตล์มินิมอล */
+        :root {
+            --bg-color: #ffffff;
+            --text-main: #333333;
+            --border-color: #dddddd;
+            --bg-gray: #f5f5f5;
+            --btn-hover: #e0e0e0;
+        }
+        
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 15px;
+            font-size: 14px;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; }
+
+        h1 { font-size: 1.5rem; text-align: center; margin-bottom: 20px; color: #555; }
+
+        /* ระบบค้นหา */
+        .search-box { position: relative; margin-bottom: 20px; }
+        .search-box input {
+            width: 100%; padding: 12px;
+            border: 1px solid var(--border-color); border-radius: 6px;
+            font-size: 1rem; outline: none;
+        }
+        .search-box input:focus { border-color: #999; }
+        .search-results {
+            position: absolute; top: 100%; left: 0; right: 0;
+            background: white; border: 1px solid var(--border-color);
+            border-top: none; border-radius: 0 0 6px 6px;
+            max-height: 250px; overflow-y: auto; z-index: 10; display: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .search-result-item { padding: 10px; border-bottom: 1px solid var(--bg-gray); cursor: pointer; }
+        .search-result-item:hover { background-color: var(--bg-gray); }
+        .result-code { font-weight: bold; }
+        .result-desc { font-size: 0.85rem; color: #666; }
+
+        /* โมเดลที่เลือก */
+        .selected-models { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+        .model-tag {
+            background: var(--bg-gray); border: 1px solid var(--border-color);
+            padding: 8px 12px; border-radius: 20px; display: flex; align-items: center;
+            font-size: 0.9rem;
+        }
+        .model-tag span { margin-right: 8px; font-weight: bold; }
+        .remove-btn { 
+            background: none; border: none; font-size: 1.2rem; cursor: pointer; 
+            color: #888; padding: 0; line-height: 1;
+        }
+        .remove-btn:hover { color: #333; }
+
+        /* ตัวเลือกแสดงผล (Toggle Specs) */
+        .toggle-section { margin-bottom: 20px; }
+        .toggle-section summary {
+            cursor: pointer; padding: 10px; background: var(--bg-gray);
+            border: 1px solid var(--border-color); border-radius: 6px; font-weight: bold;
+        }
+        .checkbox-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px; padding: 15px; border: 1px solid var(--border-color); border-top: none;
+        }
+        .checkbox-item { display: flex; align-items: center; font-size: 0.85rem; }
+        .checkbox-item input { margin-right: 8px; }
+
+        /* ตารางเปรียบเทียบ */
+        .table-container { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 6px; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 12px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
+        th { background-color: var(--bg-gray); font-weight: bold; white-space: nowrap; }
+        
+        /* ตรึงคอลัมน์แรก (ชื่อ Spec) */
+        th:first-child, td:first-child {
+            position: sticky; left: 0; background-color: #fcfcfc; z-index: 2;
+            font-weight: bold; border-right: 2px solid var(--border-color);
+            min-width: 120px;
+        }
+
+        /* QR Code Section */
+        .qrcode-container {
+            display: none; text-align: center; margin: 20px 0; padding: 20px;
+            background: var(--bg-gray); border-radius: 6px; border: 1px solid var(--border-color);
+        }
+        #qrcode { margin: 15px auto; width: 150px; height: 150px; }
+        .qr-text { font-size: 0.9rem; color: #555; margin-top: 10px; }
+
+        .loading { text-align: center; padding: 20px; color: #666; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Monitor Spec Comparison</h1>
+
+    <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
+
+    <div id="app" style="display: none;">
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="ค้นหาจาก CODE, Description หรือ PartNo... (เลือกได้สูงสุด 4 รุ่น)">
+            <div id="searchResults" class="search-results"></div>
+        </div>
+
+        <div id="selectedModelsContainer" class="selected-models"></div>
+
+        <div id="qrCodeSection" class="qrcode-container">
+            <h3 style="margin-top:0;">Direct Link QR Code</h3>
+            <div id="qrcode"></div>
+            <div class="qr-text" id="qrText">สแกนเพื่อดูสเปคสินค้ารุ่นนี้</div>
+        </div>
+
+        <details class="toggle-section" id="toggleSection">
+            <summary>ปรับแต่งหัวข้อการเปรียบเทียบ (แสดง/ซ่อน)</summary>
+            <div class="checkbox-grid" id="checkboxGrid"></div>
+        </details>
+
+        <div class="table-container">
+            <table id="compareTable">
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // URL ดึงข้อมูล CSV จาก Google Sheets
+    const SHEET_URL = "https://docs.google.com/spreadsheets/d/1HIG7msA_JvFxV8gheb1j3Y86mm3CilO4FqagJuGf8Vo/export?format=csv&gid=0";
+    
+    // สถานะของแอพพลิเคชัน
+    let allMonitors = [];
+    let selectedMonitors = [];
+    let allHeaders = [];
+    const MANDATORY_HEADERS = ["CODE", "Description", "PartNo"];
+    let optionalHeaders = [];
+    let hiddenHeaders = new Set(); // เก็บหัวข้อที่ User ไม่ต้องการให้แสดง
+
+    const searchInput = document.getElementById('searchInput');
+    const searchResults = document.getElementById('searchResults');
+    let qrCodeInstance = null;
+
+    // 1. ดึงและประมวลผลข้อมูลเริ่มต้น
+    Papa.parse(SHEET_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            allMonitors = results.data;
+            allHeaders = results.meta.fields || Object.keys(allMonitors[0]);
+            
+            // แยกหัวข้อสเปคที่ซ่อนได้ออกจากหัวข้อที่บังคับ
+            optionalHeaders = allHeaders.filter(h => !MANDATORY_HEADERS.includes(h) && h.trim() !== "");
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('app').style.display = 'block';
+            
+            initApp();
+        },
+        error: function(err) {
+            document.getElementById('loading').innerText = "เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาตรวจสอบสิทธิ์ของ Google Sheets";
+        }
+    });
+
+    function initApp() {
+        renderCheckboxes();
+
+        // ตรวจสอบ URL Parameter เผื่อมีการแสกน QR Code เข้ามา (เช่น ?code=XX)
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code');
+        if (codeParam) {
+            const found = allMonitors.find(m => m.CODE === codeParam);
+            if (found) addModel(found);
+        }
+
+        renderTable();
+        
+        // Event Listeners สำหรับระบบค้นหา
+        searchInput.addEventListener('input', handleSearch);
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.style.display = 'none';
+            }
+        });
+    }
+
+    // 2. ระบบค้นหา
+    function handleSearch(e) {
+        const query = e.target.value.toLowerCase();
+        searchResults.innerHTML = '';
+        if (query.length < 1) {
+            searchResults.style.display = 'none';
+            return;
+        }
+
+        const matches = allMonitors.filter(m => 
+            (m.CODE && m.CODE.toLowerCase().includes(query)) ||
+            (m.Description && m.Description.toLowerCase().includes(query)) ||
+            (m.PartNo && m.PartNo.toLowerCase().includes(query))
+        ).slice(0, 10); // แสดงแค่ 10 อันดับแรกให้เลือก
+
+        if (matches.length > 0) {
+            matches.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.innerHTML = `<div class="result-code">${m.CODE || '-'} (PartNo: ${m.PartNo || '-'})</div>
+                                 <div class="result-desc">${m.Description || '-'}</div>`;
+                div.onclick = () => {
+                    addModel(m);
+                    searchInput.value = '';
+                    searchResults.style.display = 'none';
+                };
+                searchResults.appendChild(div);
+            });
+            searchResults.style.display = 'block';
+        } else {
+            searchResults.style.display = 'none';
+        }
+    }
+
+    // 3. จัดการโมเดลที่ต้องการเปรียบเทียบ
+    function addModel(model) {
+        if (selectedMonitors.length >= 4) {
+            alert("สามารถเปรียบเทียบได้สูงสุด 4 รุ่นเท่านั้นครับ");
+            return;
+        }
+        if (selectedMonitors.find(m => m.CODE === model.CODE)) {
+            alert("สินค้ารุ่นนี้ถูกเลือกไปแล้วครับ");
+            return;
+        }
+        
+        selectedMonitors.push(model);
+        updateUI();
+    }
+
+    function removeModel(code) {
+        selectedMonitors = selectedMonitors.filter(m => m.CODE !== code);
+        updateUI();
+    }
+
+    // 4. แสดงผลโมเดลที่เลือก (Tags)
+    function renderSelectedModels() {
+        const container = document.getElementById('selectedModelsContainer');
+        container.innerHTML = '';
+        selectedMonitors.forEach(m => {
+            const tag = document.createElement('div');
+            tag.className = 'model-tag';
+            tag.innerHTML = `<span>${m.CODE}</span> 
+                             <button class="remove-btn" onclick="removeModel('${m.CODE}')">&times;</button>`;
+            container.appendChild(tag);
+        });
+    }
+
+    // 5. ระบบ Checkbox ซ่อน/แสดง สเปค
+    function renderCheckboxes() {
+        const container = document.getElementById('checkboxGrid');
+        container.innerHTML = '';
+        optionalHeaders.forEach(header => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = true; // ค่าเริ่มต้นให้แสดงทั้งหมด
+            checkbox.value = header;
+            checkbox.onchange = (e) => {
+                if(e.target.checked) {
+                    hiddenHeaders.delete(header);
+                } else {
+                    hiddenHeaders.add(header);
+                }
+                renderTable();
+            };
+
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(header));
+            container.appendChild(label);
+        });
+    }
+
+    // 6. สร้างตารางเปรียบเทียบ
+    function renderTable() {
+        const head = document.getElementById('tableHead');
+        const body = document.getElementById('tableBody');
+        head.innerHTML = '';
+        body.innerHTML = '';
+
+        if (selectedMonitors.length === 0) return;
+
+        // สร้างส่วนหัวตาราง (ชื่อคอลัมน์)
+        let trHead = document.createElement('tr');
+        trHead.innerHTML = `<th>Specification</th>`;
+        selectedMonitors.forEach(m => {
+            trHead.innerHTML += `<th>${m.CODE}</th>`;
+        });
+        head.appendChild(trHead);
+
+        // หัวข้อที่บังคับแสดงต้องขึ้นก่อน
+        const headersToShow = [...MANDATORY_HEADERS, ...optionalHeaders.filter(h => !hiddenHeaders.has(h))];
+
+        // สร้างแถวข้อมูลสเปค
+        headersToShow.forEach(header => {
+            let tr = document.createElement('tr');
+            // คอลัมน์แรกคือชื่อสเปค
+            tr.innerHTML = `<td>${header}</td>`;
+            // คอลัมน์ต่อๆ ไปคือข้อมูลของแต่ละรุ่น
+            selectedMonitors.forEach(m => {
+                tr.innerHTML += `<td>${m[header] || '-'}</td>`;
+            });
+            body.appendChild(tr);
+        });
+    }
+
+    // 7. จัดการ QR Code Direct Link
+    function handleQRCode() {
+        const qrSection = document.getElementById('qrCodeSection');
+        const qrContainer = document.getElementById('qrcode');
+        const qrText = document.getElementById('qrText');
+
+        if (selectedMonitors.length === 1) {
+            qrSection.style.display = 'block';
+            qrContainer.innerHTML = ''; // เคลียร์ของเก่า
+            
+            const modelCode = selectedMonitors[0].CODE;
+            // สร้าง URL ตรง (Direct link) กลับมาที่หน้านี้พร้อมแนบ ?code=
+            const directUrl = window.location.origin + window.location.pathname + "?code=" + encodeURIComponent(modelCode);
+            
+            qrCodeInstance = new QRCode(qrContainer, {
+                text: directUrl,
+                width: 150,
+                height: 150,
+                colorDark : "#333333",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.L
+            });
+            qrText.innerText = `สแกนเพื่อดูสเปค ${modelCode} โดยตรง`;
+        } else {
+            qrSection.style.display = 'none';
+        }
+    }
+
+    // ฟังก์ชันอัปเดตหน้าจอทั้งหมดเมื่อมีการเพิ่ม/ลดรุ่น
+    function updateUI() {
+        renderSelectedModels();
+        renderTable();
+        handleQRCode();
+    }
+
+</script>
+</body>
+</html>
