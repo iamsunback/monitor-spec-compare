@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Spec Comparison (V3.2)</title>
+    <title>Monitor Spec Comparison (V3.3)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
-        /* เน้นโทน ขาว-เทา สไตล์มินิมอล */
+        /* โทนสีหลัก */
         :root {
             --bg-color: #ffffff;
             --text-main: #333333;
@@ -28,10 +28,9 @@
         }
 
         .container { max-width: 1200px; margin: 0 auto; }
-
         h1 { font-size: 1.5rem; text-align: center; margin-bottom: 20px; color: #555; }
 
-        /* ระบบค้นหา และปุ่มสแกน */
+        /* ช่องค้นหาและปุ่มสแกน */
         .search-wrapper { display: flex; gap: 10px; margin-bottom: 20px; position: relative; }
         .search-box { flex-grow: 1; position: relative; }
         .search-box input {
@@ -61,7 +60,7 @@
         .result-code { font-weight: bold; }
         .result-desc { font-size: 0.85rem; color: #666; }
 
-        /* พื้นที่แสดงกล้องสแกนเนอร์ */
+        /* กล้องสแกน */
         #reader-container { display: none; margin-bottom: 20px; text-align: center; background: var(--bg-gray); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); }
         #reader { width: 100%; max-width: 400px; margin: 0 auto; }
         .close-scanner-btn { margin-top: 10px; background: #ff4d4d; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
@@ -70,17 +69,13 @@
         .selected-models { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
         .model-tag {
             background: var(--bg-gray); border: 1px solid var(--border-color);
-            padding: 8px 12px; border-radius: 20px; display: flex; align-items: center;
-            font-size: 0.9rem;
+            padding: 8px 12px; border-radius: 20px; display: flex; align-items: center; font-size: 0.9rem;
         }
         .model-tag span { margin-right: 8px; font-weight: bold; }
-        .remove-btn { 
-            background: none; border: none; font-size: 1.2rem; cursor: pointer; 
-            color: #888; padding: 0; line-height: 1;
-        }
+        .remove-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #888; padding: 0; line-height: 1; }
         .remove-btn:hover { color: #333; }
 
-        /* ตัวเลือกแสดงผล */
+        /* Checkbox ควบคุมการแสดงผล */
         .toggle-section { margin-bottom: 20px; }
         .toggle-section summary {
             cursor: pointer; padding: 10px; background: var(--bg-gray);
@@ -98,13 +93,9 @@
         table { width: 100%; border-collapse: collapse; text-align: left; }
         th, td { padding: 12px; border-bottom: 1px solid var(--border-color); border-right: 1px solid var(--border-color); }
         th { background-color: var(--bg-gray); font-weight: bold; white-space: nowrap; }
-        th:first-child, td:first-child {
-            position: sticky; left: 0; background-color: #fcfcfc; z-index: 2;
-            font-weight: bold; border-right: 2px solid var(--border-color);
-            min-width: 120px;
-        }
+        th:first-child, td:first-child { position: sticky; left: 0; background-color: #fcfcfc; z-index: 2; font-weight: bold; border-right: 2px solid var(--border-color); min-width: 120px; }
 
-        /* QR Code Section */
+        /* QR Code Direct Link */
         .qrcode-container {
             display: none; text-align: center; margin: 20px 0; padding: 20px;
             background: var(--bg-gray); border-radius: 6px; border: 1px solid var(--border-color);
@@ -112,20 +103,33 @@
         #qrcode { margin: 15px auto; width: 150px; height: 150px; display: inline-block; }
         #qrcode img, #qrcode canvas { display: inline-block; }
         .qr-text { font-size: 0.9rem; color: #555; margin-top: 10px; }
-        .download-btn {
-            background-color: var(--bg-gray); border: 1px solid var(--border-color);
-            color: var(--text-main); padding: 10px 20px; border-radius: 6px;
-            cursor: pointer; font-size: 0.9rem; margin-top: 15px; transition: background-color 0.3s;
-        }
+        .download-btn { background-color: var(--bg-gray); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-top: 15px; transition: background-color 0.3s; }
         .download-btn:hover { background-color: var(--btn-hover); }
 
         .loading { text-align: center; padding: 20px; color: #666; }
+
+        /* 🌟 ส่วนของ Popup (Modal) สำหรับผลการสแกน 🌟 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6); z-index: 1000;
+            justify-content: center; align-items: center; padding: 15px;
+        }
+        .modal-content {
+            background: #fff; width: 100%; max-width: 400px; border-radius: 8px;
+            padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .modal-content h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; }
+        .modal-info p { margin: 8px 0; font-size: 0.95rem; line-height: 1.4; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .modal-btn { padding: 10px 15px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; border: none; font-weight: bold; }
+        .btn-cancel { background: var(--bg-gray); color: #555; border: 1px solid var(--border-color); }
+        .btn-confirm { background: var(--text-main); color: white; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Monitor Spec Comparison</h1>
+    <h1>Monitor Spec Comparison v3.3</h1>
 
     <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
 
@@ -166,6 +170,18 @@
     </div>
 </div>
 
+<div id="scanModal" class="modal-overlay">
+    <div class="modal-content">
+        <h2>พบข้อมูลสินค้า</h2>
+        <div class="modal-info" id="modalInfo">
+            </div>
+        <div class="modal-actions">
+            <button class="modal-btn btn-cancel" onclick="closeModal()">ยกเลิก</button>
+            <button class="modal-btn btn-confirm" id="confirmAddBtn">Add to Compare</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const SHEET_URL = "https://docs.google.com/spreadsheets/d/1HIG7msA_JvFxV8gheb1j3Y86mm3CilO4FqagJuGf8Vo/export?format=csv&gid=0";
     
@@ -175,13 +191,16 @@
     const MANDATORY_HEADERS = ["CODE", "Description", "PartNo"];
     let optionalHeaders = [];
     let hiddenHeaders = new Set(); 
+    
+    // ตัวแปรสำหรับเก็บข้อมูลชั่วคราวตอนสแกนเจอ
+    let tempScannedModel = null;
 
     const searchInput = document.getElementById('searchInput');
     const searchResults = document.getElementById('searchResults');
     let qrCodeInstance = null;
     let html5QrcodeScanner = null;
 
-    // 1. ดึงและประมวลผลข้อมูล
+    // 1. โหลดข้อมูล
     Papa.parse(SHEET_URL, {
         download: true,
         header: true,
@@ -193,7 +212,6 @@
             
             document.getElementById('loading').style.display = 'none';
             document.getElementById('app').style.display = 'block';
-            
             initApp();
         },
         error: function(err) {
@@ -204,7 +222,6 @@
     function initApp() {
         renderCheckboxes();
 
-        // ตรวจสอบ URL Parameter เผื่อมีการแสกน QR Code แบบ Direct Link เข้ามา
         const urlParams = new URLSearchParams(window.location.search);
         const codeParam = urlParams.get('code');
         if (codeParam) {
@@ -220,36 +237,36 @@
                 searchResults.style.display = 'none';
             }
         });
+
+        // กำหนด Event ยืนยันใน Popup
+        document.getElementById('confirmAddBtn').addEventListener('click', () => {
+            if(tempScannedModel) {
+                addModel(tempScannedModel);
+                closeModal();
+            }
+        });
     }
 
-    // 2. ระบบสแกน Barcode / QR Code ผ่านกล้องมือถือ
+    // 2. ระบบสแกนกล้อง
     function toggleScanner() {
         const container = document.getElementById('reader-container');
-        if (container.style.display === 'block') {
-            stopScanner();
-        } else {
-            startScanner();
-        }
+        if (container.style.display === 'block') { stopScanner(); } 
+        else { startScanner(); }
     }
 
     function startScanner() {
         document.getElementById('reader-container').style.display = 'block';
-        
         html5QrcodeScanner = new Html5Qrcode("reader");
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
         html5QrcodeScanner.start(
-            { facingMode: "environment" }, 
-            config,
-            (decodedText, decodedResult) => {
-                // เมื่อสแกนสำเร็จ
+            { facingMode: "environment" }, config,
+            (decodedText) => {
                 stopScanner();
                 processScannedData(decodedText);
             },
-            (errorMessage) => {
-                // รอสแกนต่อไป
-            }
-        ).catch((err) => {
+            () => {} // ไม่ต้องทำอะไรถ้ายังสแกนไม่เจอ
+        ).catch(() => {
             alert("ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตให้เว็บไซต์เข้าถึงกล้องถ่ายรูป");
             stopScanner();
         });
@@ -258,45 +275,55 @@
     function stopScanner() {
         document.getElementById('reader-container').style.display = 'none';
         if (html5QrcodeScanner) {
-            html5QrcodeScanner.stop().catch(err => console.log("Error stopping scanner", err));
+            html5QrcodeScanner.stop().catch(err => console.log(err));
             html5QrcodeScanner.clear();
             html5QrcodeScanner = null;
         }
     }
 
-    // ประมวลผลข้อความที่ได้จากกล้อง (อัปเดต V3.2)
+    // 🌟 ประมวลผลและแสดง Popup (แก้ไข V3.3) 🌟
     function processScannedData(scannedText) {
-        let searchValue = scannedText;
+        let searchValue = scannedText.trim();
 
-        // ตรวจสอบว่าเป็น URL (Direct Link QR) หรือไม่
         try {
             const url = new URL(scannedText);
             const codeParam = url.searchParams.get('code');
-            if (codeParam) {
-                searchValue = codeParam; // ตัดเอาเฉพาะรหัส CODE ออกมา
-            }
-        } catch (e) {
-            // ไม่ใช่ URL แสดงว่าเป็น Barcode ปกติจากกล่อง ปล่อยผ่าน
+            if (codeParam) { searchValue = codeParam; }
+        } catch (e) { /* ปล่อยผ่านถ้าเป็นข้อความธรรมดา */ }
+
+        // ค้นหาในฐานข้อมูลด้วยโค้ด Javascript โดยตรง
+        const found = allMonitors.find(m => 
+            (m.CODE && m.CODE.toUpperCase() === searchValue.toUpperCase()) ||
+            (m.Barcode && m.Barcode === searchValue)
+        );
+
+        if (found) {
+            // กรณีเจอ: ดึงข้อมูลขึ้น Popup
+            tempScannedModel = found;
+            const infoDiv = document.getElementById('modalInfo');
+            infoDiv.innerHTML = `
+                <p><strong>CODE:</strong> ${found.CODE || '-'}</p>
+                <p><strong>Barcode:</strong> ${found.Barcode || '-'}</p>
+                <p><strong>Description:</strong> ${found.Description || '-'}</p>
+            `;
+            document.getElementById('scanModal').style.display = 'flex'; // แสดง Popup
+        } else {
+            // กรณีไม่เจอ: แจ้งเตือน Alert
+            alert("ไม่พบข้อมูลสำหรับสเปค: " + searchValue);
         }
-
-        // 1. นำค่าที่สแกนได้ไปใส่ในช่องค้นหา
-        searchInput.value = searchValue;
-        
-        // 2. บังคับให้หน้าจอโฟกัสไปที่ช่องค้นหา เพื่อป้องกันไม่ให้คลิกอื่นรบกวนการแสดงผล
-        searchInput.focus();
-
-        // 3. สั่งให้ฟังก์ชันค้นหาทำงานทันทีแบบตรงๆ (Direct Call) โดยส่ง Object ของช่องค้นหาเข้าไปแทน Event
-        handleSearch({ target: searchInput });
     }
 
-    // 3. ระบบค้นหาแบบพิมพ์
+    // ฟังก์ชันปิด Popup
+    function closeModal() {
+        document.getElementById('scanModal').style.display = 'none';
+        tempScannedModel = null;
+    }
+
+    // 3. ค้นหาแบบพิมพ์ (ปกติ)
     function handleSearch(e) {
         const query = e.target.value.toLowerCase();
         searchResults.innerHTML = '';
-        if (query.length < 1) {
-            searchResults.style.display = 'none';
-            return;
-        }
+        if (query.length < 1) { searchResults.style.display = 'none'; return; }
 
         const matches = allMonitors.filter(m => 
             (m.CODE && m.CODE.toLowerCase().includes(query)) ||
@@ -309,11 +336,10 @@
             matches.forEach(m => {
                 const div = document.createElement('div');
                 div.className = 'search-result-item';
-                div.innerHTML = `<div class="result-code">${m.CODE || '-'} (PartNo: ${m.PartNo || '-'} | Barcode: ${m.Barcode || '-'})</div>
+                div.innerHTML = `<div class="result-code">${m.CODE || '-'} (Barcode: ${m.Barcode || '-'})</div>
                                  <div class="result-desc">${m.Description || '-'}</div>`;
                 div.onclick = () => {
                     addModel(m);
-                    // ล้างช่องค้นหาเมื่อ User กดเลือกแล้วเท่านั้น
                     searchInput.value = '';
                     searchResults.style.display = 'none';
                 };
@@ -321,23 +347,15 @@
             });
             searchResults.style.display = 'block';
         } else {
-            // กรณีไม่พบข้อมูล
             searchResults.innerHTML = '<div class="search-result-item" style="color:red; text-align:center;">ไม่พบข้อมูลสเปคที่ตรงกัน</div>';
             searchResults.style.display = 'block';
         }
     }
 
-    // 4. จัดการโมเดลที่ต้องการเปรียบเทียบ
+    // 4. จัดการตารางเปรียบเทียบ
     function addModel(model) {
-        if (selectedMonitors.length >= 4) {
-            alert("สามารถเปรียบเทียบได้สูงสุด 4 รุ่นเท่านั้นครับ");
-            return;
-        }
-        if (selectedMonitors.find(m => m.CODE === model.CODE)) {
-            alert("สินค้ารุ่นนี้ถูกเลือกไปแล้วครับ");
-            return;
-        }
-        
+        if (selectedMonitors.length >= 4) { alert("สามารถเปรียบเทียบได้สูงสุด 4 รุ่นเท่านั้นครับ"); return; }
+        if (selectedMonitors.find(m => m.CODE === model.CODE)) { alert("สินค้ารุ่นนี้ถูกเลือกไปแล้วครับ"); return; }
         selectedMonitors.push(model);
         updateUI();
     }
@@ -353,117 +371,75 @@
         selectedMonitors.forEach(m => {
             const tag = document.createElement('div');
             tag.className = 'model-tag';
-            tag.innerHTML = `<span>${m.CODE}</span> 
-                             <button class="remove-btn" onclick="removeModel('${m.CODE}')">&times;</button>`;
+            tag.innerHTML = `<span>${m.CODE}</span> <button class="remove-btn" onclick="removeModel('${m.CODE}')">&times;</button>`;
             container.appendChild(tag);
         });
     }
 
-    // 5. ระบบ Checkbox ซ่อน/แสดง สเปค
     function renderCheckboxes() {
         const container = document.getElementById('checkboxGrid');
         container.innerHTML = '';
         optionalHeaders.forEach(header => {
-            const label = document.createElement('label');
-            label.className = 'checkbox-item';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = true;
-            checkbox.value = header;
+            const label = document.createElement('label'); label.className = 'checkbox-item';
+            const checkbox = document.createElement('input'); checkbox.type = 'checkbox';
+            checkbox.checked = true; checkbox.value = header;
             checkbox.onchange = (e) => {
-                if(e.target.checked) {
-                    hiddenHeaders.delete(header);
-                } else {
-                    hiddenHeaders.add(header);
-                }
+                if(e.target.checked) hiddenHeaders.delete(header);
+                else hiddenHeaders.add(header);
                 renderTable();
             };
-
-            label.appendChild(checkbox);
-            label.appendChild(document.createTextNode(header));
+            label.appendChild(checkbox); label.appendChild(document.createTextNode(header));
             container.appendChild(label);
         });
     }
 
-    // 6. สร้างตารางเปรียบเทียบ
     function renderTable() {
         const head = document.getElementById('tableHead');
         const body = document.getElementById('tableBody');
-        head.innerHTML = '';
-        body.innerHTML = '';
-
+        head.innerHTML = ''; body.innerHTML = '';
         if (selectedMonitors.length === 0) return;
 
         let trHead = document.createElement('tr');
         trHead.innerHTML = `<th>Specification</th>`;
-        selectedMonitors.forEach(m => {
-            trHead.innerHTML += `<th>${m.CODE}</th>`;
-        });
+        selectedMonitors.forEach(m => { trHead.innerHTML += `<th>${m.CODE}</th>`; });
         head.appendChild(trHead);
 
         const headersToShow = [...MANDATORY_HEADERS, ...optionalHeaders.filter(h => !hiddenHeaders.has(h))];
-
         headersToShow.forEach(header => {
             let tr = document.createElement('tr');
             tr.innerHTML = `<td>${header}</td>`;
-            selectedMonitors.forEach(m => {
-                tr.innerHTML += `<td>${m[header] || '-'}</td>`;
-            });
+            selectedMonitors.forEach(m => { tr.innerHTML += `<td>${m[header] || '-'}</td>`; });
             body.appendChild(tr);
         });
     }
 
-    // 7. จัดการ QR Code Direct Link
+    // 5. จัดการ QR Code Direct Link
     function handleQRCode() {
         const qrSection = document.getElementById('qrCodeSection');
         const qrContainer = document.getElementById('qrcode');
-        const qrText = document.getElementById('qrText');
         const downloadBtn = document.getElementById('downloadQrBtn');
-
         downloadBtn.onclick = null;
 
         if (selectedMonitors.length === 1) {
             qrSection.style.display = 'block';
             qrContainer.innerHTML = ''; 
-
             const modelCode = selectedMonitors[0].CODE;
             const directUrl = window.location.origin + window.location.pathname + "?code=" + encodeURIComponent(modelCode);
 
-            qrCodeInstance = new QRCode(qrContainer, {
-                text: directUrl,
-                width: 150,
-                height: 150,
-                colorDark: "#333333",
-                colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.L
-            });
-
-            qrText.innerText = `สแกนเพื่อดูสเปค ${modelCode} โดยตรง`;
+            qrCodeInstance = new QRCode(qrContainer, { text: directUrl, width: 150, height: 150, colorDark: "#333", colorLight: "#fff", correctLevel: QRCode.CorrectLevel.L });
+            document.getElementById('qrText').innerText = `สแกนเพื่อดูสเปค ${modelCode} โดยตรง`;
 
             downloadBtn.onclick = function() {
                 const qrImg = qrContainer.querySelector('img');
                 const qrCanvas = qrContainer.querySelector('canvas');
-
-                let imgSrc;
-                if (qrImg && qrImg.src) {
-                    imgSrc = qrImg.src;
-                } else if (qrCanvas) {
-                    imgSrc = qrCanvas.toDataURL("image/png");
-                } else {
-                    alert("เกิดข้อผิดพลาดในการดาวน์โหลด QR Code");
-                    return;
-                }
-
+                let imgSrc = (qrImg && qrImg.src) ? qrImg.src : (qrCanvas ? qrCanvas.toDataURL("image/png") : null);
+                
+                if (!imgSrc) return alert("เกิดข้อผิดพลาดในการดาวน์โหลด");
                 const downloadLink = document.createElement('a');
                 downloadLink.href = imgSrc;
                 downloadLink.download = (modelCode || 'qrcode').toUpperCase() + '.png';
-                
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
+                document.body.appendChild(downloadLink); downloadLink.click(); document.body.removeChild(downloadLink);
             };
-
         } else {
             qrSection.style.display = 'none';
         }
@@ -474,7 +450,6 @@
         renderTable();
         handleQRCode();
     }
-
 </script>
 </body>
 </html>
