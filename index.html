@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor Spec Comparison</title>
+    <title>Monitor Spec Comparison (V2)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -95,8 +95,25 @@
             display: none; text-align: center; margin: 20px 0; padding: 20px;
             background: var(--bg-gray); border-radius: 6px; border: 1px solid var(--border-color);
         }
-        #qrcode { margin: 15px auto; width: 150px; height: 150px; }
+        #qrcode { margin: 15px auto; width: 150px; height: 150px; display: inline-block; }
+        #qrcode img, #qrcode canvas { display: inline-block; } /* ensure the image can be downloaded */
         .qr-text { font-size: 0.9rem; color: #555; margin-top: 10px; }
+        
+        /* New button style */
+        .download-btn {
+            background-color: var(--bg-gray);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 15px;
+            transition: background-color 0.3s;
+        }
+        .download-btn:hover {
+            background-color: var(--btn-hover);
+        }
 
         .loading { text-align: center; padding: 20px; color: #666; }
     </style>
@@ -104,13 +121,13 @@
 <body>
 
 <div class="container">
-    <h1>Monitor Spec Comparison</h1>
+    <h1>Monitor Spec Comparison (V2)</h1>
 
     <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
 
     <div id="app" style="display: none;">
         <div class="search-box">
-            <input type="text" id="searchInput" placeholder="ค้นหาจาก CODE, Description หรือ PartNo... (เลือกได้สูงสุด 4 รุ่น)">
+            <input type="text" id="searchInput" placeholder="ค้นหาจาก CODE, Barcode, Description หรือ PartNo... (เลือกได้สูงสุด 4 รุ่น)">
             <div id="searchResults" class="search-results"></div>
         </div>
 
@@ -120,6 +137,7 @@
             <h3 style="margin-top:0;">Direct Link QR Code</h3>
             <div id="qrcode"></div>
             <div class="qr-text" id="qrText">สแกนเพื่อดูสเปคสินค้ารุ่นนี้</div>
+            <button id="downloadQrBtn" class="download-btn">Save as PNG</button>
         </div>
 
         <details class="toggle-section" id="toggleSection">
@@ -196,7 +214,7 @@
         });
     }
 
-    // 2. ระบบค้นหา
+    // 2. ระบบค้นหา (ปรับปรุง V2: เพิ่มการค้นหาด้วย Barcode)
     function handleSearch(e) {
         const query = e.target.value.toLowerCase();
         searchResults.innerHTML = '';
@@ -207,6 +225,7 @@
 
         const matches = allMonitors.filter(m => 
             (m.CODE && m.CODE.toLowerCase().includes(query)) ||
+            (m.Barcode && m.Barcode.toLowerCase().includes(query)) || // New Barcode condition
             (m.Description && m.Description.toLowerCase().includes(query)) ||
             (m.PartNo && m.PartNo.toLowerCase().includes(query))
         ).slice(0, 10); // แสดงแค่ 10 อันดับแรกให้เลือก
@@ -215,7 +234,8 @@
             matches.forEach(m => {
                 const div = document.createElement('div');
                 div.className = 'search-result-item';
-                div.innerHTML = `<div class="result-code">${m.CODE || '-'} (PartNo: ${m.PartNo || '-'})</div>
+                // ปรับปรุงผลลัพธ์การค้นหาให้แสดง Barcode ด้วย
+                div.innerHTML = `<div class="result-code">${m.CODE || '-'} (PartNo: ${m.PartNo || '-'} | Barcode: ${m.Barcode || '-'})</div>
                                  <div class="result-desc">${m.Description || '-'}</div>`;
                 div.onclick = () => {
                     addModel(m);
@@ -323,29 +343,68 @@
         });
     }
 
-    // 7. จัดการ QR Code Direct Link
+    // 7. จัดการ QR Code Direct Link (ปรับปรุง V2: เพิ่มฟังก์ชันดาวน์โหลด PNG)
     function handleQRCode() {
         const qrSection = document.getElementById('qrCodeSection');
         const qrContainer = document.getElementById('qrcode');
         const qrText = document.getElementById('qrText');
+        const downloadBtn = document.getElementById('downloadQrBtn'); // select new button
+
+        // Reset the download button's event listener to avoid duplicates
+        downloadBtn.onclick = null;
 
         if (selectedMonitors.length === 1) {
             qrSection.style.display = 'block';
-            qrContainer.innerHTML = ''; // เคลียร์ของเก่า
-            
+            qrContainer.innerHTML = ''; // clear previous QR
+
             const modelCode = selectedMonitors[0].CODE;
             // สร้าง URL ตรง (Direct link) กลับมาที่หน้านี้พร้อมแนบ ?code=
             const directUrl = window.location.origin + window.location.pathname + "?code=" + encodeURIComponent(modelCode);
-            
+
+            // Generate the QR code
             qrCodeInstance = new QRCode(qrContainer, {
                 text: directUrl,
                 width: 150,
                 height: 150,
-                colorDark : "#333333",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.L
+                colorDark: "#333333",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.L
             });
+
             qrText.innerText = `สแกนเพื่อดูสเปค ${modelCode} โดยตรง`;
+
+            // Implement download functionality
+            downloadBtn.onclick = function() {
+                // Find the image element inside the container
+                // QRCodeJS usually puts an <img> tag
+                const qrImg = qrContainer.querySelector('img');
+
+                // If qrcodejs used a canvas (some configs/browsers), handle that too
+                const qrCanvas = qrContainer.querySelector('canvas');
+
+                let imgSrc;
+                if (qrImg) {
+                    imgSrc = qrImg.src;
+                } else if (qrCanvas) {
+                    imgSrc = qrCanvas.toDataURL("image/png");
+                } else {
+                    alert("เกิดข้อผิดพลาดในการดึงรูปภาพ QR Code กรุณาลองใหม่");
+                    return;
+                }
+
+                // Create a dynamic <a> element for the download
+                const downloadLink = document.createElement('a');
+                downloadLink.href = imgSrc;
+                // Set the filename: [CODE].png (default)
+                const filename = (modelCode || 'qrcode').toUpperCase() + '.png';
+                downloadLink.download = filename;
+
+                // Programmatically click the link to trigger download
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink); // Clean up
+            };
+
         } else {
             qrSection.style.display = 'none';
         }
